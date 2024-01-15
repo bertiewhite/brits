@@ -1,67 +1,50 @@
-use std::fmt;
+use thiserror::Error;
 
 // tmp allow dead_code
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct Queue<T: Clone> {
     head: Option<Node<T>>,
     length: i32,
 }
-
 // tmp allow dead_code
+//
 #[allow(dead_code)]
 struct Node<T: Clone> {
     data: T,
     next: Option<Box<Node<T>>>,
 }
 
-// tmp allow dead_code
-#[allow(dead_code)]
-pub fn new<T: Clone>() -> Queue<T> {
-    return Queue {
-        head: None,
-        length: 0,
-    };
-}
-
-pub struct EmptyQueueError;
-impl fmt::Display for EmptyQueueError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Queue is empty")
-    }
+#[derive(Error, Debug)]
+pub enum QueueErr {
+    #[error("Queue is empty")]
+    EmptyQueueError,
 }
 
 // tmp allow dead_code
 #[allow(dead_code)]
-impl<'a, T: Clone> Queue<T> {
-    pub fn add(&mut self, elem: T) {
-        let mut node = Node {
-            data: elem,
-            next: None,
-        };
+impl<T: Clone> Queue<T> {
+    pub fn add(mut self, elem: T) -> Self {
+        let mut node = new(elem);
         match self.head {
             Option::None => self.head = Option::Some(node),
-            Option::Some(_) => {
-                let head = self.head.take().expect("won't happen");
+            Option::Some(head) => {
                 node = node.set_next(head);
                 self.head = Option::Some(node);
             }
         }
-        self.length += 1
+        self.length += 1;
+        return self;
     }
 
-    pub fn pop(&mut self) -> Result<T, EmptyQueueError> {
-        match self.head {
-            Option::None => return Err(EmptyQueueError),
-            Option::Some(_) => {
-                let head = self.head.take().expect("won't happen");
-                match head.next {
-                    Option::None => {}
-                    Option::Some(next) => self.head = Option::Some(*next),
-                }
-                self.length -= 1;
-                return Ok(head.data);
-            }
-        };
+    pub fn pop(&mut self) -> Result<T, QueueErr> {
+        let head = self.head.take().ok_or_else(|| QueueErr::EmptyQueueError)?;
+        match head.next {
+            Option::None => {}
+            Option::Some(next) => self.head = Option::Some(*next),
+        }
+        self.length -= 1;
+        return Ok(head.data);
     }
 }
 
@@ -74,15 +57,22 @@ impl<'a, T: Clone> Node<T> {
     }
 }
 
+fn new<T: Clone>(elem: T) -> Node<T> {
+    Node {
+        data: elem,
+        next: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn queue_adds() {
-        let mut q: Queue<i32> = new();
-        q.add(3);
-        q.add(2);
+        let mut q: Queue<i32> = Queue::default();
+        q = q.add(3);
+        q = q.add(2);
 
         let mut res = q.pop();
         match res {
